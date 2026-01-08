@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>がくしゅうマスター 湖畔小エディション</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --main-color: #4CAF50;
+            --sub-color: #FFC107;
+            --accent-color: #FF5722;
+            --bg-color: #F0F4F8;
+            --white: #ffffff;
+        }
+
+        body {
+            font-family: 'Hiragino Sans', 'Meiryo', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding-bottom: 80px;
+            color: #333;
+        }
+
+        .btn { border: none; padding: 15px; width: 100%; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; }
+        .btn-start { background: var(--main-color); color: white; }
+        .btn-stop { background: #f44336; color: white; margin-top: 10px; }
+        .btn-save { background: var(--sub-color); color: #333; margin-top: 15px; }
+        .btn-outline { background: transparent; border: 2px solid #ccc; color: #666; font-size: 0.9rem; padding: 8px; margin-top: 5px;}
+
+        /* 設定画面 */
+        #setup-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--main-color); z-index: 2000; display: none; flex-direction: column; justify-content: center; align-items: center; color: white; }
+        
+        /* ナビゲーション */
+        .nav-bar { position: fixed; bottom: 0; width: 100%; background: var(--white); display: flex; justify-content: space-around; padding: 10px 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 100; }
+        .nav-item { text-align: center; font-size: 0.7rem; flex: 1; cursor: pointer; color: #888; border:none; background:none;}
+        .nav-item.active { color: var(--main-color); font-weight: bold; }
+        .nav-item-icon { font-size: 1.5rem; display: block; margin-bottom: 2px;}
+
+        /* コンテンツ */
+        .content { padding: 20px; max-width: 600px; margin: 0 auto; display: none; }
+        .content.active { display: block; }
+        .card { background: var(--white); border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+
+        /* プロフィール */
+        .profile-display { background: var(--main-color); color: white; padding: 15px 20px; border-radius: 0 0 20px 20px; display: flex; align-items: center; justify-content: space-between; }
+        .coin-display { background: rgba(0,0,0,0.2); padding: 5px 15px; border-radius: 20px; font-weight: bold; }
+        #char-img-slot { font-size: 3rem; margin-right: 15px; }
+
+        /* タイマー・教科 */
+        #timer-display { font-size: 3.5rem; text-align: center; margin: 15px 0; font-weight: bold; background: #eee; border-radius: 10px; padding: 10px; }
+        .subject-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 10px 0; }
+        .subject-item { font-size: 0.8rem; background: #f9f9f9; border: 1px solid #ddd; padding: 8px; border-radius: 5px; text-align: center; cursor: pointer; user-select: none; }
+        .subject-item.selected { background: var(--sub-color); border-color: orange; font-weight: bold; }
+        .subject-item input { display: none; }
+
+        /* 統計カード */
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .stat-card { background: #e8f5e9; padding: 15px; border-radius: 10px; text-align: center; }
+        .stat-card span { font-size: 0.7rem; color: #666; display: block; }
+        .stat-card div { font-size: 1.1rem; font-weight: bold; color: var(--main-color); }
+
+        /* ショップ */
+        .shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .shop-item { background: #fff; border-radius: 15px; padding: 15px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border: 2px solid transparent;}
+        .shop-item.owned { border-color: var(--main-color); background: #f1f8e9; }
+        .char-preview { font-size: 3.5rem; }
+    </style>
+</head>
+<body>
+
+<div id="setup-screen">
+    <h2>はじめまして！</h2>
+    <input type="text" id="user-name" placeholder="おなまえ" style="width: 80%; padding: 12px; margin: 10px; border-radius: 10px; border: none; font-size: 1rem;">
+    <select id="user-grade" style="width: 80%; padding: 12px; margin: 10px; border-radius: 10px; border: none; font-size: 1rem;">
+        <option value="1ねんせい">1ねんせい</option><option value="2ねんせい">2ねんせい</option>
+        <option value="3ねんせい">3ねんせい</option><option value="4ねんせい">4ねんせい</option>
+        <option value="5ねんせい">5ねんせい</option><option value="6ねんせい">6ねんせい</option>
+    </select>
+    <button class="btn btn-save" onclick="saveProfile()">スタート！</button>
+</div>
+
+<div class="profile-display">
+    <div id="char-img-slot">🥚</div>
+    <div style="flex-grow:1;">
+        <div id="home-grade-name" style="font-size: 0.8rem;">ゲストさん</div>
+        <div id="room-rank-name" style="font-weight: bold;">湖畔小のたまごルーム</div>
+    </div>
+    <div class="coin-display">💰 <span id="my-coins">0</span></div>
+</div>
+
+<div id="tab-study" class="content active">
+    <div class="card">
+        <h2>⏱️ 勉強をはじめる</h2>
+        <div class="subject-grid" id="subject-selector">
+            <label class="subject-item"><input type="checkbox" value="国語">📖 国語</label>
+            <label class="subject-item"><input type="checkbox" value="算数">🔢 算数</label>
+            <label class="subject-item"><input type="checkbox" value="理科">🧪 理科</label>
+            <label class="subject-item"><input type="checkbox" value="社会">🗺️ 社会</label>
+            <label class="subject-item"><input type="checkbox" value="英語">🔤 英語</label>
+            <label class="subject-item"><input type="checkbox" value="音図">🎨 音図</label>
+            <label class="subject-item"><input type="checkbox" value="読書">📚 読書</label>
+            <label class="subject-item"><input type="checkbox" value="自学">✏️ 自学</label>
+            <label class="subject-item"><input type="checkbox" value="他">🌟 他</label>
+        </div>
+        <div id="timer-display">00:00</div>
+        <button id="btn-start" class="btn btn-start" onclick="startTimer()">スタート！</button>
+        <button id="btn-stop" class="btn btn-stop" onclick="stopTimer()" style="display:none;">おしまい</button>
+    </div>
+    <div id="save-area" class="card" style="display:none;">
+        <h2 id="result-text"></h2>
+        <textarea id="memo" placeholder="ふりかえりをかこう！" rows="2" style="width:100%; padding:10px; box-sizing:border-box; border-radius:10px; border:1px solid #ccc;"></textarea>
+        <button class="btn btn-save" onclick="saveData()">保存してコインをもらう</button>
+    </div>
+</div>
+
+<div id="tab-stats" class="content">
+    <div class="card"><h2>📊 教科のバランス</h2><canvas id="pieChart"></canvas></div>
+    <div class="card">
+        <h2>📈 時間の推移</h2>
+        <div style="display:flex; gap:5px; margin-bottom:10px;">
+            <button class="btn" style="padding:5px; font-size:0.8rem;" onclick="updateBarChart('daily', event)">1ヶ月</button>
+            <button class="btn" style="padding:5px; font-size:0.8rem;" onclick="updateBarChart('monthly', event)">1年</button>
+        </div>
+        <canvas id="barChart"></canvas>
+    </div>
+    <div class="stat-grid">
+        <div class="stat-card"><span>1日の最高記録</span><div id="stat-max">0分</div></div>
+        <div class="stat-card"><span>1日の最低記録</span><div id="stat-min">0分</div></div>
+    </div>
+</div>
+
+<div id="tab-shop" class="content">
+    <div class="card" style="text-align:center; background:var(--sub-color);">
+        <h3>🏪 相棒ショップ</h3>
+        <p>いまのコイン: 💰<span id="shop-coins">0</span></p>
+    </div>
+    <div id="shop-list" class="shop-grid"></div>
+</div>
+
+<div id="tab-history" class="content">
+    <div class="card" style="border: 2px dashed #ccc; background: #f9f9f9;">
+        <h3 style="margin-top:0; font-size:0.9rem;">💾 データのバックアップ</h3>
+        <p style="font-size:0.7rem; color:#666;">履歴を消すとデータが消えちゃうよ！月に1回は「ほぞん」してGoogleドライブに入れておこう。</p>
+        <button class="btn-outline" onclick="downloadBackup()" style="width:48%;">データをほぞん</button>
+        <button class="btn-outline" onclick="document.getElementById('importFile').click()" style="width:48%;">もとにもどす</button>
+        <input type="file" id="importFile" style="display:none" accept=".json" onchange="importBackup(event)">
+    </div>
+
+    <div class="card"><h2>📖 ふりかえり一覧</h2><div id="history-list"></div></div>
+</div>
+
+<div class="nav-bar">
+    <div class="nav-item active" onclick="showTab('study', event)"><span class="nav-item-icon">✏️</span>べんきょう</div>
+    <div class="nav-item" onclick="showTab('stats', event)"><span class="nav-item-icon">📊</span>グラフ</div>
+    <div class="nav-item" onclick="showTab('shop', event)"><span class="nav-item-icon">🏪</span>ショップ</div>
+    <div class="nav-item" onclick="showTab('history', event)"><span class="nav-item-icon">📖</span>ログ</div>
+</div>
+
+<script>
+    let logs = JSON.parse(localStorage.getItem('studyLogsV3')) || [];
+    let profile = JSON.parse(localStorage.getItem('userProfileV3')) || { name: "", grade: "", coins: 0, myChars: ['egg'], equip: 'egg' };
+    
+    const CHARS = [
+        { id: 'egg', name: 'たまご', img: '🥚', price: 0 },
+        { id: 'chick', name: 'ひよこ', img: '🐤', price: 200 },
+        { id: 'penguin', name: 'ペンギン', img: '🐧', price: 600 },
+        { id: 'owl', name: 'フクロウ', img: '🦉', price: 1500 },
+        { id: 'tiger', name: 'トラ', img: '🐯', price: 3000 },
+        { id: 'dragon', name: 'ドラゴン', img: '🐲', price: 10000 }
+    ];
+
+    window.onload = function() {
+        if (!profile.name) document.getElementById('setup-screen').style.display = 'flex';
+        updateUI();
+        setupSubjectListeners();
+    };
+
+    function updateUI() {
+        document.getElementById('home-grade-name').innerText = `${profile.grade} ${profile.name}`;
+        const totalMin = logs.reduce((sum, log) => sum + log.actual, 0);
+        let rankName = "湖畔小のたまごルーム";
+        if (totalMin >= 10000) rankName = "湖畔小の伝説のマスタールーム";
+        else if (totalMin >= 5000) rankName = "湖畔小のがくしゅうの鉄人ルーム";
+        else if (totalMin >= 2000) rankName = "湖畔小のべんきょう名人ルーム";
+        else if (totalMin >= 500) rankName = "湖畔小のがんばりルーム";
+        else if (totalMin >= 100) rankName = "湖畔小のひよっこルーム";
+        document.getElementById('room-rank-name').innerText = rankName;
+        document.getElementById('my-coins').innerText = profile.coins;
+        const c = CHARS.find(x => x.id === profile.equip) || CHARS[0];
+        document.getElementById('char-img-slot').innerText = c.img;
+    }
+
+    function saveProfile() {
+        const n = document.getElementById('user-name').value;
+        const g = document.getElementById('user-grade').value;
+        if (!n) return alert("名前をいれてね");
+        profile.name = n; profile.grade = g;
+        localStorage.setItem('userProfileV3', JSON.stringify(profile));
+        document.getElementById('setup-screen').style.display = 'none';
+        updateUI();
+    }
+
+    function setupSubjectListeners() {
+        document.querySelectorAll('.subject-item').forEach(item => {
+            item.onclick = function() {
+                const cb = this.querySelector('input');
+                cb.checked = !cb.checked;
+                this.classList.toggle('selected', cb.checked);
+            };
+        });
+    }
+
+    let startTime, timerInterval, elapsed = 0;
+    function startTimer() {
+        startTime = Date.now();
+        document.getElementById('btn-start').style.display = 'none';
+        document.getElementById('btn-stop').style.display = 'block';
+        timerInterval = setInterval(() => {
+            elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const m = Math.floor(elapsed / 60).toString().padStart(2, '0');
+            const s = (elapsed % 60).toString().padStart(2, '0');
+            document.getElementById('timer-display').innerText = `${m}:${s}`;
+        }, 1000);
+    }
+
+    function stopTimer() {
+        clearInterval(timerInterval);
+        document.getElementById('btn-start').style.display = 'block';
+        document.getElementById('btn-stop').style.display = 'none';
+        const min = Math.round(elapsed / 60);
+        document.getElementById('result-text').innerText = `🎉 ${min}分 がんばった！ 💰${min}コイン`;
+        document.getElementById('save-area').style.display = 'block';
+    }
+
+    function saveData() {
+        const min = Math.round(elapsed / 60);
+        if (min < 1) return alert("1分以上やってから保存してね！");
+        const memoText = document.getElementById('memo').value;
+        if (memoText.length <= 10) return alert("自分のためにふりかえりをしっかり書こう！");
+
+        const selected = Array.from(document.querySelectorAll('.subject-item input:checked')).map(i => i.value);
+        logs.push({
+            date: new Date().toISOString().split('T')[0],
+            month: new Date().toISOString().substring(0, 7),
+            subs: selected.length ? selected.join(',') : "その他",
+            actual: min,
+            memo: memoText
+        });
+        profile.coins += min;
+        localStorage.setItem('studyLogsV3', JSON.stringify(logs));
+        localStorage.setItem('userProfileV3', JSON.stringify(profile));
+        alert("保存したよ！");
+        location.reload();
+    }
+
+    let pChart, bChart;
+    function showTab(name, e) {
+        document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.getElementById('tab-' + name).classList.add('active');
+        if(e) e.currentTarget.classList.add('active');
+        if (name === 'stats') initCharts();
+        if (name === 'shop') initShop();
+        if (name === 'history') initHistory();
+    }
+
+    // バックアップ機能
+    function downloadBackup() {
+        const data = { logs, profile };
+        const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `湖畔小べんきょうバックアップ_${profile.name}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function importBackup(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                if (data.logs && data.profile) {
+                    if (confirm("データを上書きして元にもどしますか？")) {
+                        localStorage.setItem('studyLogsV3', JSON.stringify(data.logs));
+                        localStorage.setItem('userProfileV3', JSON.stringify(data.profile));
+                        alert("元にもどったよ！");
+                        location.reload();
+                    }
+                } else {
+                    alert("正しいファイルじゃないみたい。");
+                }
+            } catch (err) { alert("エラーが起きたよ。"); }
+        };
+        reader.readAsText(file);
+    }
+
+    function initCharts() {
+        const counts = {};
+        logs.forEach(l => {
+            const ss = l.subs.split(',');
+            ss.forEach(s => counts[s] = (counts[s] || 0) + (l.actual / ss.length));
+        });
+        if(pChart) pChart.destroy();
+        pChart = new Chart(document.getElementById('pieChart'), {
+            type: 'pie', data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'] }] }
+        });
+        updateRecordNumbers();
+        updateBarChart('daily');
+    }
+
+    function updateRecordNumbers() {
+        if (logs.length === 0) return;
+        const agg = {};
+        logs.forEach(l => { agg[l.date] = (agg[l.date] || 0) + l.actual; });
+        const values = Object.values(agg);
+        document.getElementById('stat-max').innerText = Math.max(...values) + "分";
+        document.getElementById('stat-min').innerText = Math.min(...values) + "分";
+    }
+
+    function updateBarChart(mode, e) {
+        if(e) {
+            const btns = e.currentTarget.parentElement.querySelectorAll('button');
+            btns.forEach(b => b.style.opacity = '0.6');
+            e.currentTarget.style.opacity = '1';
+        }
+        const agg = {};
+        logs.forEach(l => { const k = (mode === 'daily') ? l.date : l.month; agg[k] = (agg[k] || 0) + l.actual; });
+        const labels = Object.keys(agg).sort().slice(mode === 'daily' ? -30 : -12);
+        if(bChart) bChart.destroy();
+        bChart = new Chart(document.getElementById('barChart'), {
+            type: 'bar', data: { labels, datasets: [{ label: '分', data: labels.map(l => agg[l]), backgroundColor: '#4CAF50' }] },
+            options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 10 } } } }
+        });
+    }
+
+    function initShop() {
+        document.getElementById('shop-coins').innerText = profile.coins;
+        const list = document.getElementById('shop-list');
+        list.innerHTML = '';
+        CHARS.forEach(c => {
+            const owned = profile.myChars.includes(c.id);
+            const canBuy = profile.coins >= c.price;
+            list.innerHTML += `<div class="shop-item ${owned ? 'owned' : ''}">
+                <div class="char-preview">${c.img}</div><div>${c.name}</div>
+                <div style="font-size:0.8rem;">💰${c.price}</div>
+                ${owned ? `<button class="btn" style="padding:5px; font-size:0.7rem; background:#4CAF50; color:white;" onclick="equip('${c.id}')">${profile.equip === c.id ? '装備中':'使う'}</button>` 
+                        : `<button class="btn" style="padding:5px; font-size:0.7rem; background:#FF5722; color:white;" ${canBuy ? '' : 'disabled'} onclick="buy('${c.id}',${c.price})">買う</button>`}
+            </div>`;
+        });
+    }
+
+    function buy(id, p) { if(confirm("買っていい？")){ profile.coins -= p; profile.myChars.push(id); localStorage.setItem('userProfileV3', JSON.stringify(profile)); initShop(); } }
+    function equip(id) { profile.equip = id; localStorage.setItem('userProfileV3', JSON.stringify(profile)); updateUI(); initShop(); }
+    function initHistory() {
+        const list = document.getElementById('history-list');
+        list.innerHTML = logs.slice().reverse().map(l => `<div style="border-bottom:1px solid #eee; padding:10px 0;">
+            <small>${l.date}</small> <strong>${l.actual}分</strong> [${l.subs}]<br>${l.memo}</div>`).join('');
+    }
+</script>
+</body>
+</html>
